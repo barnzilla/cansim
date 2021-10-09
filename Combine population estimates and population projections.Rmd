@@ -1,0 +1,75 @@
+---
+title: "Combine population estimates and population projections"
+author: "Joel Barnes"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document: 
+    toc: true
+    number_sections: false
+    toc_float: true
+    toc_depth: 5
+  word_document: 
+    toc: yes
+    toc_depth: 5
+  pdf_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+  html, body { font-size: 14px; }
+  h1 { font-size: 1.75rem; margin-top: 30px; }
+  h1.title { font-size: 2rem; color: #484848; }
+  h2 { font-size: 1.35rem; margin-top: 30px; }
+  h3 { font-size: 1.15rem; margin-top: 30px; }
+  h4 { font-size: 1.05rem; margin-top: 30px; }
+  h4.date { margin-top: 0rem; margin-bottom: 3rem; }
+  a, a:hover { color: #fff; }
+  p.caption { margin-top: 2rem; }
+  blockquote { border-left: 5px solid #cccccc; font-size: 1rem; background-color: #00AFBB; color: #ffffff; font-weight: bold; }
+  .interpretation blockquote { border-left: 5px solid #cccccc; font-size: 1rem; background-color: #00AFBB; color: #ffffff; font-weight: normal; }
+  .gmisc_table, table { width: 100%; }
+  img { width: 100%; height: auto; }
+  .list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #00AFBB;
+    border-color: #00AFBB;
+}
+</style>
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+> Note: this document is confidential. Please do not share.
+
+## Load dependencies
+
+```{r}
+library(dplyr); library(readr)
+```
+
+## Import data
+
+```{r}
+# CANSIM Table 17-10-0005-01 (population estimates)
+d <- read_csv("c:/users/joelb/onedrive/github/cansim/CANSIM Table 17-10-0005-01 - wrangled.csv")
+  
+# CANSIM Table 17-10-0057-01 (population projections)
+d2 <- read_csv("c:/users/joelb/onedrive/github/cansim/CANSIM Table 17-10-0057-01 - wrangled.csv")
+```
+
+## Bind imported data
+
+```{r}
+d3 <- bind_rows(d, d2)
+```
+
+## Export data
+
+```{r}
+write.csv(d3, "c:/users/joelb/onedrive/github/cansim/CANSIM population data - estimates and projections combined.csv", na = "", row.names = FALSE)
+```

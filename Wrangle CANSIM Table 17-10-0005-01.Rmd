@@ -1,0 +1,273 @@
+---
+title: "Wrangle CANSIM Table 17-10-0005-01"
+author: "Joel Barnes"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document: 
+    toc: true
+    number_sections: false
+    toc_float: true
+    toc_depth: 5
+  word_document: 
+    toc: yes
+    toc_depth: 5
+  pdf_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+<style>
+  html, body { font-size: 14px; }
+  h1 { font-size: 1.75rem; margin-top: 30px; }
+  h1.title { font-size: 2rem; color: #484848; }
+  h2 { font-size: 1.35rem; margin-top: 30px; }
+  h3 { font-size: 1.15rem; margin-top: 30px; }
+  h4 { font-size: 1.05rem; margin-top: 30px; }
+  h4.date { margin-top: 0rem; margin-bottom: 3rem; }
+  a, a:hover { color: #fff; }
+  p.caption { margin-top: 2rem; }
+  blockquote { border-left: 5px solid #cccccc; font-size: 1rem; background-color: #00AFBB; color: #ffffff; font-weight: bold; }
+  .interpretation blockquote { border-left: 5px solid #cccccc; font-size: 1rem; background-color: #00AFBB; color: #ffffff; font-weight: normal; }
+  .gmisc_table, table { width: 100%; }
+  img { width: 100%; height: auto; }
+  .list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #00AFBB;
+    border-color: #00AFBB;
+}
+</style>
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+> Note: this document is confidential. Please do not share.
+
+## Load dependencies
+
+```{r}
+library(cansim); library(dplyr); library(stringr)
+```
+
+## Import data
+
+```{r eval = FALSE}
+# CANSIM Table 17-10-0005-01 (population estimates)
+d <- get_cansim("17-10-0005-01")
+```
+
+```{r echo = FALSE}
+d <- readRDS("c:/users/joelb/onedrive/github/cansim/CANSIM Table 17-10-0005-01.rds")
+```
+
+## Wrangle data
+### Filter on age groups
+
+```{r}
+# Retain select groups
+d <- d %>% filter(
+  `Age group` %in% c(paste0(seq(from = 0, to = 95, by = 5), " to ", seq(from = 4, to = 99, by = 5), " years"), "All ages", "100 years and over")
+)
+```
+
+### Standardize age group values
+
+```{r}
+# Coerce to character class
+d$`Age group` <- as.character(d$`Age group`)
+
+# Standardize values
+d$`Age group` <- sapply(d$`Age group`, function(x) {
+  if(is.na(x)) {
+    output <- NA
+  } else if(str_detect(tolower(x), "all")) {
+    output <- "All"
+  } else if(str_detect(x, "over")) {
+    output <- "[100,max["
+  } else {
+    output <- paste0(
+      "[",
+      strsplit(x, " ")[[1]][1],
+      ",",
+      as.integer(strsplit(x, " ")[[1]][3]) + 1,
+      "["
+    )
+  }
+})
+```
+
+### Standarize sex values
+
+```{r}
+# Coerce to character class
+d$Sex <- as.character(d$Sex)
+
+# Standardize values
+d$Sex <- sapply(d$Sex, function(x) {
+  if(is.na(x)) {
+    output <- NA
+  } else if(x == "Both sexes") {
+    output <- "All"
+  } else {
+    output <- substr(x, 1, nchar(x) - 1)
+  }
+})
+```
+
+### Filter on year
+
+```{r}
+# Retain years 2001 to 2021 
+d <- d %>% filter(REF_DATE >= 2001, REF_DATE <= 2021)
+```
+
+### Filter on province
+
+```{r}
+# Remove the territories
+d <- d %>% filter(
+  ! GEO %in% c("Northwest Territories", "Nunavut", "Yukon")
+)
+```
+
+### Standardize province values
+
+```{r}
+d$GEO <- sapply(d$GEO, function(x) {
+  if(is.na(x)) {
+    output <- NA
+  } else if(x == "Canada") {
+    output <- "All"
+  } else if(x == "Newfoundland and Labrador") {
+    output <- "Newfoundland"
+  } else if(x == "Prince Edward Island") {
+    output <- "P.E.I."
+  } else {
+    output <- x
+  }
+})
+```
+
+### Filter on vectors
+
+```{r}
+# Retain select vectors
+d <- d %>% select(
+  REF_DATE,
+  GEO,
+  `Age group`,
+  Sex,
+  val_norm
+)
+```
+
+### Rename vectors
+
+```{r}
+names(d) <- c(
+  "year",
+  "province",
+  "age",
+  "sex",
+  "population_count"
+)
+```
+
+### Add engine vector
+
+```{r}
+d$engine <- "CANSIM"
+```
+
+### Rearrange vectors
+
+```{r}
+d <- d[c("engine", "province", "sex", "year", "age", "population_count")]
+```
+
+### Recompute aggregate population counts
+
+```{r}
+# Add a couple of vectors
+d$population_count_pohem <- NA
+d$all_count <- NA
+
+# Count, by row, the number of vectors that factor into the aggregated population count
+for(i in 1:nrow(d)) {
+  d$all_count[i] <- sum(unlist(d[i, c("province", "sex", "year", "age")]) == "All")
+}
+
+# Compute population counts for rows without aggregated data
+for(i in which(d$all_count == 0)) {
+  d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province == d$province[i] & d$sex == d$sex[i] & d$year == d$year[i] & d$age == d$age[i]]))
+}
+
+# Compute aggregated population counts for rows with one-factor aggregation 
+for(i in which(d$all_count == 1)) {
+  if(d$province[i] == "All") {
+    d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province != "All" & d$sex == d$sex[i] & d$year == d$year[i] & d$age == d$age[i]]))
+  } else if(d$sex[i] == "All") {
+    d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province == d$province[i] & d$sex != "All" & d$year == d$year[i] & d$age == d$age[i]]))
+  }  else if(d$age[i] == "All") {
+    d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province == d$province[i] & d$sex == d$sex[i] & d$year == d$year[i] & d$age != "All"]))
+  }
+}
+
+# Compute aggregated population counts for rows with two-factor aggregation 
+for(i in which(d$all_count == 2)) {
+  if(d$province[i] == "All" & d$sex[i] == "All") {
+    d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province != "All" & d$sex != "All" & d$year == d$year[i] & d$age == d$age[i]]))
+  } else if(d$province[i] == "All" & d$age[i] == "All") {
+    d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province != "All" & d$sex == d$sex[i] & d$year == d$year[i] & d$age != d$age[i]]))
+  } else if(d$sex[i] == "All" & d$age[i] == "All") {
+    d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province == d$province[i] & d$sex != "All" & d$year == d$year[i] & d$age != "All"]))
+  } 
+}
+
+# Compute aggregated population counts for rows with three-factor aggregation 
+for(i in which(d$all_count == 3)) {
+  d$population_count_pohem[i] <- sum(unlist(d$population_count[d$province != "All" & d$sex != "All" & d$year == d$year[i] & d$age != "All"]))
+}
+
+# Add a vector the computes the relative difference
+d$relative_difference <- (d$population_count_pohem - d$population_count) / d$population_count * 100
+```
+
+### Add rows for 0-19 year-olds
+
+```{r}
+# Create grid of unique values by province, sex and year
+grid <- expand.grid(
+  province = unique(d$province),
+  sex = unique(d$sex),
+  year = unique(d$year)
+)
+
+# Iterate through the grid
+for(i in 1:nrow(grid)) {
+  d <- bind_rows(
+    d,
+    tibble(
+      engine = "CANSIM",
+      province = grid$province[i],
+      sex = grid$sex[i],
+      year = grid$year[i],
+      age = "[min,20[",
+      population_count = 0,
+      population_count_pohem = 0,
+      all_count = NA,
+      relative_difference = NA
+    )
+  )
+}
+
+```
+
+## Export data
+
+```{r}
+write.csv(d, "c:/users/joelb/onedrive/github/cansim/CANSIM Table 17-10-0005-01 - wrangled.csv", na = "", row.names = FALSE)
+```
