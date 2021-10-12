@@ -69,7 +69,7 @@ d <- readRDS("c:/users/joelb/onedrive/github/cansim/CANSIM Table 17-10-0005-01.r
 ```{r}
 # Retain select groups
 d <- d %>% filter(
-  `Age group` %in% c(paste0(seq(from = 0, to = 95, by = 5), " to ", seq(from = 4, to = 99, by = 5), " years"), "All ages", "100 years and over")
+  `Age group` %in% c(paste0(seq(from = 20, to = 95, by = 5), " to ", seq(from = 24, to = 99, by = 5), " years"), "All ages", "100 years and over")
 )
 ```
 
